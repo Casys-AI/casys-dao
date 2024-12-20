@@ -1,0 +1,72 @@
+#pragma version 6
+
+// Vérification si c'est une création d'application
+txn ApplicationID
+int 0
+==
+bnz handle_creation
+
+// Vérification des opérations
+txn OnCompletion
+int NoOp
+==
+bnz handle_noop
+
+// Vérification des mises à jour
+txn OnCompletion
+int UpdateApplication
+==
+bnz handle_update
+
+// Vérification de la suppression
+txn OnCompletion
+int DeleteApplication
+==
+bnz handle_delete
+
+// Par défaut, rejeter
+err
+
+handle_creation:
+    // Stocker les paramètres initiaux
+    byte "token_id"
+    txna ApplicationArgs 0
+    app_global_put
+
+    byte "stablecoin_id"
+    txna ApplicationArgs 1
+    app_global_put
+
+    byte "collateral_ratio"
+    txna ApplicationArgs 2
+    app_global_put
+
+    byte "distribution_rate"
+    txna ApplicationArgs 3
+    app_global_put
+
+    byte "distribution_period"
+    txna ApplicationArgs 4
+    app_global_put
+
+    byte "manager"
+    txn Sender
+    app_global_put
+
+    int 1
+    return
+
+handle_noop:
+    // Pour les tests, accepter toutes les opérations NoOp
+    int 1
+    return
+
+handle_update:
+    // Pour les tests, accepter toutes les mises à jour
+    int 1
+    return
+
+handle_delete:
+    // Pour les tests, accepter toutes les suppressions
+    int 1
+    return

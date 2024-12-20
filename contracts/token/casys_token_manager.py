@@ -3,7 +3,6 @@ from algosdk.transaction import AssetConfigTxn, AssetTransferTxn
 from algosdk.transaction import wait_for_confirmation
 from algosdk import account
 from contracts.models import CaSysTokenConfig
-from contracts.utils import ensure_base64_padding
 
 class CaSysTokenManager:
     """
@@ -17,7 +16,7 @@ class CaSysTokenManager:
         Create the CaSys Token
         
         Args:
-            creator_private_key: Creator's private key
+            creator_private_key: Creator's private key in base64 format
             config: CaSysTokenConfig model instance
             
         Returns:
@@ -27,11 +26,11 @@ class CaSysTokenManager:
         params = self.algod_client.suggested_params()
         
         # Get creator's address from private key
-        creator_address = account.address_from_private_key(ensure_base64_padding(creator_private_key))
+        creator_address = account.address_from_private_key(creator_private_key)
         
         # Create the token
         txn = AssetConfigTxn(
-            sender=creator_address,  # Use the creator's address, not private key
+            sender=creator_address,
             sp=params,
             total=config.total_supply,
             default_frozen=False,
@@ -74,7 +73,7 @@ class CaSysTokenManager:
         
         Args:
             token_id: Token ID
-            sender_private_key: Sender's private key
+            sender_private_key: Sender's private key in base64 format
             receiver: Receiver's address
             amount: Amount to transfer
             
@@ -84,7 +83,7 @@ class CaSysTokenManager:
         params = self.algod_client.suggested_params()
         
         txn = AssetTransferTxn(
-            sender=sender_private_key,
+            sender=account.address_from_private_key(sender_private_key),
             sp=params,
             receiver=receiver,
             amt=amount,
@@ -120,7 +119,7 @@ class CaSysTokenManager:
         
         Args:
             token_id: Token ID
-            freeze_manager_private_key: Freeze manager's private key
+            freeze_manager_private_key: Freeze manager's private key in base64 format
             target: Target account address
             
         Returns:
@@ -129,7 +128,7 @@ class CaSysTokenManager:
         params = self.algod_client.suggested_params()
         
         txn = AssetTransferTxn(
-            sender=freeze_manager_private_key,
+            sender=account.address_from_private_key(freeze_manager_private_key),
             sp=params,
             receiver=target,
             amt=0,
@@ -149,7 +148,7 @@ class CaSysTokenManager:
         
         Args:
             token_id: Token ID
-            freeze_manager_private_key: Freeze manager's private key
+            freeze_manager_private_key: Freeze manager's private key in base64 format
             target: Target account address
             
         Returns:
@@ -158,7 +157,7 @@ class CaSysTokenManager:
         params = self.algod_client.suggested_params()
         
         txn = AssetTransferTxn(
-            sender=freeze_manager_private_key,
+            sender=account.address_from_private_key(freeze_manager_private_key),
             sp=params,
             receiver=target,
             amt=0,

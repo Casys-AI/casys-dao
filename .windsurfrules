@@ -2,6 +2,8 @@
 
 Voici une version adaptée pour **Algorand**, en utilisant **PyTeal** pour écrire les smart contracts et **ASA (Algorand Standard Assets)** pour gérer les tokens. Les user stories suivent une progression logique, du basique au spécifique.
 
+IL FAUT LIRE LA DOCUMENTATION
+
 ---
 
 ### **Phase 1 : Développer la Base du Système**

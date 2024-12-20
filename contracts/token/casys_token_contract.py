@@ -14,7 +14,7 @@ def approval_program():
     op_transfer = Bytes("transfer")
     op_modify_manager = Bytes("modify_manager")
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def is_manager():
         return And(
             Global.group_size() == Int(1),
@@ -32,7 +32,17 @@ def approval_program():
     # Handle ASA transfers
     on_transfer = Seq([
         Assert(Txn.application_args.length() == Int(4)),
-        # Add transfer logic here
+        transfer_amount = Btoi(Txn.application_args[1]),
+        # Vérifier que le montant est valide
+        Assert(And(
+            transfer_amount > Int(0),
+            transfer_amount <= Int(2**31 - 1)  # Max safe value for int32
+        )),
+        # Vérifier le solde
+        Assert(AssetHolding.balance(
+            Txn.sender(),
+            Txn.assets[0]
+        ).value() >= transfer_amount),
         Return(Int(1))
     ])
     

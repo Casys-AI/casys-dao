@@ -22,12 +22,27 @@ def approval_program():
     op_redeem_bond = Bytes("redeem_bond")
     op_update_rate = Bytes("update_rate")
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def is_manager():
         return And(
             Global.group_size() == Int(1),
             Txn.sender() == App.globalGet(manager_key)
         )
+    
+    @Subroutine(TealType.uint32)
+    def is_bond_mature(lock_time):
+        return Global.latest_timestamp() >= (
+            lock_time + App.globalGet(min_lock_time_key)
+        )
+    
+    @Subroutine(TealType.uint32)
+    def calculate_interest(amount, lock_time):
+        time_locked = Global.latest_timestamp() - lock_time
+        interest_rate = App.globalGet(interest_rate_key)
+        # Éviter le dépassement en divisant d'abord
+        yearly_factor = time_locked / Int(31536000)  # secondes par an
+        rate_factor = interest_rate / Int(100)
+        return amount + (amount * yearly_factor * rate_factor)
     
     # Initialize the contract
     on_initialize = Seq([
@@ -57,17 +72,12 @@ def approval_program():
     # Redeem a bond
     on_redeem_bond = Seq([
         Assert(App.localGet(Txn.sender(), bond_amount_key) > Int(0)),
-        Assert(
-            Global.latest_timestamp() >= 
-            App.localGet(Txn.sender(), lock_time_key) + 
-            App.globalGet(min_lock_time_key)
-        ),
+        Assert(is_bond_mature(App.localGet(Txn.sender(), lock_time_key))),
         # Calculate interest
-        interest = (
-            App.localGet(Txn.sender(), bond_amount_key) *
-            App.globalGet(interest_rate_key) *
-            (Global.latest_timestamp() - App.localGet(Txn.sender(), lock_time_key))
-        ) / Int(10000),
+        interest = calculate_interest(
+            App.localGet(Txn.sender(), bond_amount_key),
+            App.localGet(Txn.sender(), lock_time_key)
+        ),
         # Clear local state
         App.localDel(Txn.sender(), bond_amount_key),
         App.localDel(Txn.sender(), lock_time_key),

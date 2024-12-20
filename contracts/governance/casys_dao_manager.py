@@ -1,8 +1,9 @@
 from algosdk.transaction import ApplicationCreateTxn, ApplicationCallTxn
 from algosdk.transaction import wait_for_confirmation
 from algosdk.v2client import algod
-from contracts.models import CaSysDAOConfig, CaSysProposalConfig
+from contracts.models import CaSysDAOConfig, CaSysProposalConfig, ProposalAction, ProposalType
 from algosdk.transaction import OnComplete
+from algosdk.account import address_from_private_key
 
 class CaSysDAOManager:
     """
@@ -101,6 +102,75 @@ class CaSysDAOManager:
         # Get proposal ID from app state
         app_info = self.algod_client.application_info(dao_id)
         return app_info['params']['global-state']['proposal_count']
+    
+    def propose_yield_rate(self, dao_id: int, proposer_private_key: str, new_rate: int) -> int:
+        """
+        Propose un nouveau taux de yield
+        
+        Args:
+            dao_id: DAO ID
+            proposer_private_key: Clé privée du proposeur
+            new_rate: Nouveau taux (0-1000 pour 0% à 100%)
+            
+        Returns:
+            int: ID de la proposition
+        """
+        action = ProposalAction(
+            type=ProposalType.YIELD_RATE,
+            value=new_rate
+        )
+        config = CaSysProposalConfig(
+            title="Modification du taux de yield",
+            description=f"Proposition de changement du taux de yield à {new_rate/10}%",
+            action=action
+        )
+        return self.create_proposal(dao_id, proposer_private_key, config)
+    
+    def propose_token_mint(self, dao_id: int, proposer_private_key: str, amount: int) -> int:
+        """
+        Propose la création de nouveaux tokens
+        
+        Args:
+            dao_id: DAO ID
+            proposer_private_key: Clé privée du proposeur
+            amount: Nombre de tokens à créer
+            
+        Returns:
+            int: ID de la proposition
+        """
+        action = ProposalAction(
+            type=ProposalType.MINT_TOKENS,
+            value=amount
+        )
+        config = CaSysProposalConfig(
+            title="Création de nouveaux tokens",
+            description=f"Proposition de création de {amount} nouveaux tokens",
+            action=action
+        )
+        return self.create_proposal(dao_id, proposer_private_key, config)
+    
+    def propose_collateral_ratio(self, dao_id: int, proposer_private_key: str, new_ratio: int) -> int:
+        """
+        Propose un nouveau ratio de collatéral
+        
+        Args:
+            dao_id: DAO ID
+            proposer_private_key: Clé privée du proposeur
+            new_ratio: Nouveau ratio (0-10000 pour 0% à 1000%)
+            
+        Returns:
+            int: ID de la proposition
+        """
+        action = ProposalAction(
+            type=ProposalType.COLLATERAL_RATIO,
+            value=new_ratio
+        )
+        config = CaSysProposalConfig(
+            title="Modification du ratio de collatéral",
+            description=f"Proposition de changement du ratio de collatéral à {new_ratio/10}%",
+            action=action
+        )
+        return self.create_proposal(dao_id, proposer_private_key, config)
     
     def cast_vote(self, dao_id: int, proposal_id: int, voter_private_key: str,
                  in_favor: bool) -> bool:

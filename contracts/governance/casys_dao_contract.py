@@ -12,8 +12,17 @@ def approval_program():
     voting_period_key = Bytes("voting_period")
     execution_delay_key = Bytes("execution_delay")
     quorum_key = Bytes("quorum")
+    collateral_app_id = Bytes("collateral_app_id")
+    token_app_id = Bytes("token_app_id")
     
+    # Types de propositions
+    prop_type_yield = Bytes("yield_rate")
+    prop_type_mint = Bytes("mint_tokens")
+    prop_type_ratio = Bytes("collateral_ratio")
+
     # Local state keys (per proposal)
+    proposal_type_key = Bytes("type")
+    proposal_value_key = Bytes("value")
     proposal_title_key = Bytes("title")
     proposal_description_key = Bytes("description")
     proposal_start_key = Bytes("start_time")
@@ -29,52 +38,126 @@ def approval_program():
     op_vote = Bytes("vote")
     op_execute = Bytes("execute")
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def is_proposal_active(proposal_id):
         return And(
             App.localGet(Int(proposal_id), proposal_start_key) <= Global.latest_timestamp(),
             Global.latest_timestamp() < App.localGet(Int(proposal_id), proposal_end_key)
         )
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def can_execute_proposal(proposal_id):
         return And(
             Global.latest_timestamp() >= App.localGet(Int(proposal_id), proposal_execution_key),
             Not(App.localGet(Int(proposal_id), proposal_executed_key))
         )
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def has_quorum(proposal_id):
         total_votes = App.localGet(Int(proposal_id), proposal_votes_for_key) + \
                      App.localGet(Int(proposal_id), proposal_votes_against_key)
         return total_votes >= App.globalGet(quorum_key)
     
+    @Subroutine(TealType.uint32)
+    def validate_proposal_value(proposal_type, value):
+        return Cond(
+            [proposal_type == prop_type_yield,
+             And(
+                 value >= Int(0),
+                 value <= Int(1000),  # Max 100%
+                 # Vérifier que la valeur est un multiple de 1 (0.1%)
+                 value % Int(1) == Int(0)
+             )],
+            [proposal_type == prop_type_mint,
+             And(
+                 value > Int(0),
+                 value <= Int(2**31 - 1)  # Max safe value for int32
+             )],
+            [proposal_type == prop_type_ratio,
+             And(
+                 value >= Int(0),
+                 value <= Int(10000),  # Max 1000%
+                 # Vérifier que la valeur est un multiple de 1 (0.1%)
+                 value % Int(1) == Int(0)
+             )]
+        )
+
+    @Subroutine(TealType.uint32)
+    def execute_proposal_action(proposal_id):
+        proposal_type = App.localGet(Int(proposal_id), proposal_type_key)
+        proposal_value = App.localGet(Int(proposal_id), proposal_value_key)
+        
+        # Valider la valeur avant l'exécution
+        Assert(validate_proposal_value(proposal_type, proposal_value))
+        
+        return Cond(
+            [proposal_type == prop_type_yield,
+             Seq([
+                 InnerTxnBuilder.Begin(),
+                 InnerTxnBuilder.SetFields({
+                     TxnField.type_enum: TxnType.ApplicationCall,
+                     TxnField.application_id: App.globalGet(collateral_app_id),
+                     TxnField.application_args: [Bytes("update_yield_rate"), Itob(proposal_value)]
+                 }),
+                 InnerTxnBuilder.Submit(),
+                 Int(1)
+             ])],
+            
+            [proposal_type == prop_type_mint,
+             Seq([
+                 InnerTxnBuilder.Begin(),
+                 InnerTxnBuilder.SetFields({
+                     TxnField.type_enum: TxnType.ApplicationCall,
+                     TxnField.application_id: App.globalGet(token_app_id),
+                     TxnField.application_args: [Bytes("mint"), Itob(proposal_value)]
+                 }),
+                 InnerTxnBuilder.Submit(),
+                 Int(1)
+             ])],
+            
+            [proposal_type == prop_type_ratio,
+             Seq([
+                 InnerTxnBuilder.Begin(),
+                 InnerTxnBuilder.SetFields({
+                     TxnField.type_enum: TxnType.ApplicationCall,
+                     TxnField.application_id: App.globalGet(collateral_app_id),
+                     TxnField.application_args: [Bytes("update_collateral_ratio"), Itob(proposal_value)]
+                 }),
+                 InnerTxnBuilder.Submit(),
+                 Int(1)
+             ])]
+        )
+    
     # Initialize the contract
     on_initialize = Seq([
-        Assert(Txn.application_args.length() == Int(6)),
+        Assert(Txn.application_args.length() == Int(8)),
         App.globalPut(token_id_key, Btoi(Txn.application_args[1])),
         App.globalPut(proposal_threshold_key, Btoi(Txn.application_args[2])),
         App.globalPut(voting_period_key, Btoi(Txn.application_args[3])),
         App.globalPut(execution_delay_key, Btoi(Txn.application_args[4])),
         App.globalPut(quorum_key, Btoi(Txn.application_args[5])),
+        App.globalPut(collateral_app_id, Btoi(Txn.application_args[6])),
+        App.globalPut(token_app_id, Btoi(Txn.application_args[7])),
         App.globalPut(proposal_counter_key, Int(0)),
         Return(Int(1))
     ])
     
     # Create a new proposal
     on_create_proposal = Seq([
-        Assert(Txn.application_args.length() == Int(4)),  # op, title, description, execution_delay
+        Assert(Txn.application_args.length() == Int(6)),  # op, type, value, title, description, execution_delay
         Assert(AssetHolding.balance(Txn.sender(), App.globalGet(token_id_key)) >= 
               App.globalGet(proposal_threshold_key)),
         
         # Calculate timestamps
         start_time := Global.latest_timestamp(),
         end_time := start_time + App.globalGet(voting_period_key),
-        execution_time := end_time + Btoi(Txn.application_args[3]),
+        execution_time := end_time + Btoi(Txn.application_args[5]),
         
         # Store proposal data
-        App.localPut(Txn.sender(), proposal_title_key, Txn.application_args[1]),
-        App.localPut(Txn.sender(), proposal_description_key, Txn.application_args[2]),
+        App.localPut(Txn.sender(), proposal_type_key, Txn.application_args[1]),
+        App.localPut(Txn.sender(), proposal_value_key, Btoi(Txn.application_args[2])),
+        App.localPut(Txn.sender(), proposal_title_key, Txn.application_args[3]),
+        App.localPut(Txn.sender(), proposal_description_key, Txn.application_args[4]),
         App.localPut(Txn.sender(), proposal_start_key, start_time),
         App.localPut(Txn.sender(), proposal_end_key, end_time),
         App.localPut(Txn.sender(), proposal_execution_key, execution_time),
@@ -132,6 +215,9 @@ def approval_program():
         votes_for := App.localGet(Int(proposal_id), proposal_votes_for_key),
         votes_against := App.localGet(Int(proposal_id), proposal_votes_against_key),
         Assert(votes_for > votes_against),
+        
+        # Execute proposal action
+        execute_proposal_action(proposal_id),
         
         # Mark proposal as executed
         App.localPut(Int(proposal_id), proposal_executed_key, Int(1)),

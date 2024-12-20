@@ -61,12 +61,52 @@ class CaSysDAOConfig(BaseModel):
     execution_delay: int = Field(43200, description="Execution delay in seconds", gt=0)
     proposal_threshold: int = Field(..., description="Minimum tokens to create proposal", gt=0)
 
+class ProposalType:
+    """Types de propositions disponibles"""
+    YIELD_RATE = "yield_rate"
+    MINT_TOKENS = "mint_tokens"
+    COLLATERAL_RATIO = "collateral_ratio"
+
+class ProposalAction(BaseModel):
+    """Action de la proposition"""
+    type: str = Field(..., description="Type de proposition")
+    value: int = Field(..., description="Nouvelle valeur proposée")
+
+    @field_validator('type')
+    def validate_type(cls, v: str) -> str:
+        valid_types = [
+            ProposalType.YIELD_RATE,
+            ProposalType.MINT_TOKENS,
+            ProposalType.COLLATERAL_RATIO
+        ]
+        if v not in valid_types:
+            raise ValueError(f"Type de proposition invalide. Doit être l'un de : {valid_types}")
+        return v
+
+    @field_validator('value')
+    def validate_value(cls, v: int, values: Dict[str, Any]) -> int:
+        if 'type' not in values:
+            return v
+            
+        if values['type'] == ProposalType.YIELD_RATE:
+            if not (0 <= v <= 1000):  # 0% à 100% avec 1 décimale
+                raise ValueError("Le taux de yield doit être entre 0 et 1000 (0% à 100%)")
+        
+        elif values['type'] == ProposalType.COLLATERAL_RATIO:
+            if not (0 <= v <= 10000):  # 0% à 1000% avec 1 décimale
+                raise ValueError("Le ratio de collatéral doit être entre 0 et 10000 (0% à 1000%)")
+        
+        elif values['type'] == ProposalType.MINT_TOKENS:
+            if v <= 0:
+                raise ValueError("Le nombre de tokens à créer doit être positif")
+                
+        return v
+
 class CaSysProposalConfig(BaseModel):
-    """Configuration for CaSys Proposal"""
-    title: str = Field(..., description="Proposal title")
-    description: str = Field(..., description="Proposal description")
-    action_type: str = Field(..., description="Type of action to execute")
-    action_data: Dict[str, Any] = Field(..., description="Action parameters")
+    """Configuration pour une proposition CaSys"""
+    title: str = Field(..., description="Titre de la proposition")
+    description: str = Field(..., description="Description de la proposition")
+    action: ProposalAction = Field(..., description="Action de la proposition")
 
 class CaSysProposal(BaseModel):
     """CaSys DAO Proposal"""

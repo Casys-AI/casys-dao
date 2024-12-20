@@ -1,111 +1,121 @@
 import pytest
-from algosdk.v2client import algod
-from contracts.governance.casys_dao_manager import CaSysDAOManager
-from contracts.models import CaSysDAOConfig, CaSysProposalConfig
+from datetime import datetime, timedelta
 from algosdk import account
-import time
+from contracts.governance.casys_dao_manager import CaSysDAOManager
+from contracts.models import CaSysDAOConfig, ProposalAction, ProposalType
 
-def create_test_account():
-    private_key, address = account.generate_account()
-    return private_key, address
-
-@pytest.fixture
-def algod_client():
-    # Connect to Algorand node
-    algod_token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    algod_address = "http://localhost:4001"
-    return algod.AlgodClient(algod_token, algod_address)
-
-@pytest.fixture
-def dao_manager(algod_client):
-    return CaSysDAOManager(algod_client)
-
-@pytest.fixture
-def dao_config():
-    return CaSysDAOConfig(
-        token_id=1,  # Assuming token ID 1 exists
-        quorum=51,  # 51% quorum required
-        voting_period=86400,  # 24 hours
-        execution_delay=43200  # 12 hours
-    )
-
-@pytest.fixture
-def proposal_config():
-    return CaSysProposalConfig(
-        title="Test Proposal",
-        description="This is a test proposal",
-        action_type="transfer",
-        action_data={"recipient": "test_address", "amount": 1000}
-    )
-
-def test_create_dao(dao_manager, dao_config):
-    """Test DAO creation"""
-    creator_private_key, _ = create_test_account()
+class TestCaSysGovernance:
+    @pytest.fixture(scope="module")
+    def accounts(self):
+        return [account.generate_account() for _ in range(5)]
     
-    dao_id = dao_manager.create_dao(creator_private_key, dao_config)
-    assert dao_id > 0
+    @pytest.fixture(scope="module")
+    def dao_config(self, accounts):
+        return CaSysDAOConfig(
+            token_id=1,
+            quorum=51,  # 51%
+            voting_period=86400,  # 1 jour
+            execution_delay=43200,  # 12 heures
+            proposal_threshold=1000000  # 1M tokens minimum
+        )
     
-    # Verify DAO info
-    dao_info = dao_manager.get_dao_info(dao_id)
-    assert dao_info['token_id'] == dao_config.token_id
-    assert dao_info['quorum'] == dao_config.quorum
-    assert dao_info['voting_period'] == dao_config.voting_period
-    assert dao_info['execution_delay'] == dao_config.execution_delay
-
-def test_create_proposal(dao_manager, dao_config, proposal_config):
-    """Test proposal creation"""
-    creator_private_key, _ = create_test_account()
+    @pytest.fixture(scope="module")
+    def dao_manager(self, algod_client):
+        return CaSysDAOManager(algod_client)
     
-    # Create DAO first
-    dao_id = dao_manager.create_dao(creator_private_key, dao_config)
+    def test_propose_yield_rate(self, dao_manager, accounts, dao_config):
+        # Configuration
+        creator_private_key = accounts[0][0]
+        proposer_private_key = accounts[1][0]
+        new_rate = 50  # 5%
+        
+        # Créer la DAO
+        dao_id = dao_manager.create_dao(creator_private_key, dao_config)
+        
+        # Créer la proposition
+        proposal_id = dao_manager.propose_yield_rate(
+            dao_id,
+            proposer_private_key,
+            new_rate
+        )
+        
+        # Vérifier la proposition
+        proposal = dao_manager.get_proposal(dao_id, proposal_id)
+        assert proposal.action.type == ProposalType.YIELD_RATE
+        assert proposal.action.value == new_rate
     
-    # Create proposal
-    proposal_id = dao_manager.create_proposal(dao_id, creator_private_key, proposal_config)
-    assert proposal_id > 0
+    def test_propose_token_mint(self, dao_manager, accounts, dao_config):
+        # Configuration
+        creator_private_key = accounts[0][0]
+        proposer_private_key = accounts[1][0]
+        amount = 1000000  # 1M tokens
+        
+        # Créer la DAO
+        dao_id = dao_manager.create_dao(creator_private_key, dao_config)
+        
+        # Créer la proposition
+        proposal_id = dao_manager.propose_token_mint(
+            dao_id,
+            proposer_private_key,
+            amount
+        )
+        
+        # Vérifier la proposition
+        proposal = dao_manager.get_proposal(dao_id, proposal_id)
+        assert proposal.action.type == ProposalType.MINT_TOKENS
+        assert proposal.action.value == amount
     
-    # Verify proposal info
-    proposal_info = dao_manager.get_proposal_info(dao_id, proposal_id)
-    assert proposal_info['title'] == proposal_config.title
-    assert proposal_info['description'] == proposal_config.description
-    assert proposal_info['action_type'] == proposal_config.action_type
-    assert proposal_info['action_data'] == proposal_config.action_data
-
-def test_cast_vote(dao_manager, dao_config, proposal_config):
-    """Test vote casting"""
-    creator_private_key, _ = create_test_account()
-    voter_private_key, voter_address = create_test_account()
+    def test_propose_collateral_ratio(self, dao_manager, accounts, dao_config):
+        # Configuration
+        creator_private_key = accounts[0][0]
+        proposer_private_key = accounts[1][0]
+        new_ratio = 1500  # 150%
+        
+        # Créer la DAO
+        dao_id = dao_manager.create_dao(creator_private_key, dao_config)
+        
+        # Créer la proposition
+        proposal_id = dao_manager.propose_collateral_ratio(
+            dao_id,
+            proposer_private_key,
+            new_ratio
+        )
+        
+        # Vérifier la proposition
+        proposal = dao_manager.get_proposal(dao_id, proposal_id)
+        assert proposal.action.type == ProposalType.COLLATERAL_RATIO
+        assert proposal.action.value == new_ratio
     
-    # Create DAO and proposal
-    dao_id = dao_manager.create_dao(creator_private_key, dao_config)
-    proposal_id = dao_manager.create_proposal(dao_id, creator_private_key, proposal_config)
-    
-    # Cast vote
-    success = dao_manager.cast_vote(dao_id, proposal_id, voter_private_key, True)
-    assert success is True
-    
-    # Verify vote info
-    vote_info = dao_manager.get_vote_info(dao_id, proposal_id, voter_address)
-    assert vote_info['in_favor'] is True
-
-def test_execute_proposal(dao_manager, dao_config, proposal_config):
-    """Test proposal execution"""
-    creator_private_key, _ = create_test_account()
-    voter_private_key, voter_address = create_test_account()
-    
-    # Create DAO and proposal
-    dao_id = dao_manager.create_dao(creator_private_key, dao_config)
-    proposal_id = dao_manager.create_proposal(dao_id, creator_private_key, proposal_config)
-    
-    # Cast vote (assuming enough votes for quorum)
-    dao_manager.cast_vote(dao_id, proposal_id, voter_private_key, True)
-    
-    # Fast forward time past voting period and execution delay
-    # This would be handled by the testing framework
-    
-    # Execute proposal
-    success = dao_manager.execute_proposal(dao_id, proposal_id, creator_private_key)
-    assert success is True
-    
-    # Verify proposal status
-    proposal_info = dao_manager.get_proposal_info(dao_id, proposal_id)
-    assert proposal_info['status'] == 'executed'
+    def test_full_proposal_lifecycle(self, dao_manager, accounts, dao_config):
+        # Configuration
+        creator_private_key = accounts[0][0]
+        proposer_private_key = accounts[1][0]
+        voter1_private_key = accounts[2][0]
+        voter2_private_key = accounts[3][0]
+        new_rate = 50  # 5%
+        
+        # Créer la DAO
+        dao_id = dao_manager.create_dao(creator_private_key, dao_config)
+        
+        # Créer la proposition
+        proposal_id = dao_manager.propose_yield_rate(
+            dao_id,
+            proposer_private_key,
+            new_rate
+        )
+        
+        # Voter pour la proposition
+        dao_manager.cast_vote(dao_id, proposal_id, voter1_private_key, True)
+        dao_manager.cast_vote(dao_id, proposal_id, voter2_private_key, True)
+        
+        # Attendre la fin du vote
+        proposal = dao_manager.get_proposal(dao_id, proposal_id)
+        assert proposal.votes_for > proposal.votes_against
+        
+        # Exécuter la proposition
+        success = dao_manager.execute_proposal(dao_id, proposal_id, creator_private_key)
+        assert success
+        
+        # Vérifier que la proposition a été exécutée
+        proposal = dao_manager.get_proposal(dao_id, proposal_id)
+        assert proposal.executed

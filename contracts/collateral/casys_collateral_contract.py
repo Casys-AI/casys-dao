@@ -24,19 +24,29 @@ def approval_program():
     op_update_ratio = Bytes("update_ratio")
     op_update_rate = Bytes("update_rate")
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def is_manager():
         return And(
             Global.group_size() == Int(1),
             Txn.sender() == App.globalGet(manager_key)
         )
     
-    @Subroutine(TealType.uint64)
+    @Subroutine(TealType.uint32)
     def can_distribute():
         return Global.latest_timestamp() >= (
             App.globalGet(last_distribution_key) + 
             App.globalGet(distribution_period_key)
         )
+    
+    @Subroutine(TealType.uint32)
+    def calculate_yield(amount):
+        return (amount * App.globalGet(distribution_rate_key)) / Int(1000)
+    
+    @Subroutine(TealType.uint32)
+    def validate_collateral_ratio(token_amount, collateral_amount):
+        # Éviter le dépassement en divisant d'abord par 100
+        collateral_ratio = (collateral_amount / Int(100)) * Int(100) / token_amount
+        return collateral_ratio >= App.globalGet(collateral_ratio_key)
     
     # Initialize the contract
     on_initialize = Seq([
@@ -94,7 +104,7 @@ def approval_program():
         distribution_amount := (
             App.globalGet(total_collateral_key) * 
             App.globalGet(distribution_rate_key)
-        ) / Int(10000),
+        ) / Int(1000),
         
         # Update last distribution time
         App.globalPut(last_distribution_key, Global.latest_timestamp()),
