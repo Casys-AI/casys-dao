@@ -1,0 +1,198 @@
+### **Feuille de Route : Développement du Projet en Algorand**
+
+Voici une version adaptée pour **Algorand**, en utilisant **PyTeal** pour écrire les smart contracts et **ASA (Algorand Standard Assets)** pour gérer les tokens. Les user stories suivent une progression logique, du basique au spécifique.
+
+---
+
+### **Phase 1 : Développer la Base du Système**
+
+#### **1. Gestion des tokens**
+- En tant qu'utilisateur, je peux créer un token avec un nombre fixe (supply) pour garantir que le total ne change qu'à travers des votes.
+  - **Critères d'acceptation :**
+    - Les tokens sont émis en tant qu’ASA lors de l’initialisation.
+    - Les tokens peuvent être transférés entre les utilisateurs.
+- En tant qu'utilisateur, je peux vérifier le solde des tokens d'une adresse pour connaître mes avoirs.
+
+#### **2. Blocage des tokens**
+- En tant qu'investisseur, je peux bloquer mes tokens pour recevoir des obligations.
+  - **Critères d'acceptation :**
+    - Les tokens bloqués sont enregistrés dans un smart contract spécifique.
+    - Les tokens bloqués ne peuvent pas être transférés tant qu'ils sont verrouillés.
+- En tant que créateur, je peux débloquer une partie des fonds après avoir déposé un collatéral.
+  - **Critères d'acceptation :**
+    - La part de fonds débloqués respecte un ratio défini (ex. 70%).
+    - Un stablecoin (ex. USDC sur Algorand) est utilisé comme collatéral.
+
+---
+
+### **Phase 2 : Implémenter la Redistribution et les Obligations**
+
+#### **3. Redistribution des revenus**
+- En tant qu'investisseur, je peux recevoir un rendement régulier basé sur ma part dans les tokens bloqués.
+  - **Critères d'acceptation :**
+    - Un pourcentage du collatéral est redistribué périodiquement via un smart contract.
+    - La redistribution est proportionnelle au nombre de tokens bloqués.
+
+- En tant qu'investisseur, je peux voter pour fixer le taux annuel de redistribution.
+  - **Critères d'acceptation :**
+    - Un mécanisme de vote basé sur les tokens bloqués valide les changements (majorité 51%).
+
+#### **4. Remboursement des obligations**
+- En tant qu'investisseur, je peux recevoir mes obligations sous forme de tokens à l’échéance.
+  - **Critères d'acceptation :**
+    - Les obligations sont remboursées en tokens, avec le nombre initial d'obligations respecté.
+
+---
+
+### **Phase 3 : Implémenter la Gouvernance**
+
+#### **5. Votes et gouvernance**
+- En tant qu'investisseur, je peux voter pour l'émission de nouveaux tokens.
+  - **Critères d'acceptation :**
+    - Le vote est proportionnel aux parts bloquées.
+    - Les nouveaux tokens sont distribués aux investisseurs existants proportionnellement.
+
+- En tant qu'investisseur, je peux voter pour réaffecter une partie de la réserve à des usages spécifiques (ex. stabilisation).
+  - **Critères d'acceptation :**
+    - Les décisions validées par vote s’exécutent automatiquement via le smart contract.
+
+#### **6. Rééquilibrage du collatéral**
+- En tant que créateur, je peux ajuster le collatéral si la valeur du token change.
+  - **Critères d'acceptation :**
+    - Si la valeur augmente, le collatéral requis diminue automatiquement.
+    - Si la valeur baisse, un appel de marge est déclenché.
+
+---
+
+### **Phase 4 : Optimisation et Sécurisation**
+
+#### **7. Gestion des fonds supplémentaires**
+- En tant qu'investisseur, je peux acheter de nouveaux tokens via des contrats d'obligations.
+  - **Critères d'acceptation :**
+    - Les nouveaux acheteurs reçoivent des obligations avec les mêmes règles que les investisseurs existants.
+
+#### **8. Oracles pour le prix des tokens**
+- En tant que système, je peux utiliser un oracle pour récupérer la valeur actuelle du token.
+  - **Critères d'acceptation :**
+    - Le contrat interagit avec un oracle compatible Algorand pour obtenir les données de prix.
+    - Les données de l’oracle sont vérifiées avant d’être utilisées.
+
+#### **9. Sécurisation**
+- En tant qu'utilisateur, je veux que le système soit auditable et robuste.
+  - **Critères d'acceptation :**
+    - Le contrat empêche les débordements et les comportements indésirables.
+    - Les redistributions, votes et remboursements sont traçables.
+
+---
+
+### **Phase 5 : Déploiement et Tests Réels**
+
+#### **10. Déploiement sur TestNet**
+- En tant que développeur, je veux déployer et tester le contrat sur le testnet Algorand.
+  - **Critères d'acceptation :**
+    - Le contrat fonctionne sans erreurs sur le TestNet.
+    - Les interactions (redistribution, vote, remboursement) sont validées.
+
+#### **11. Déploiement sur MainNet**
+- En tant que créateur, je veux déployer le système sur le réseau principal.
+  - **Critères d'acceptation :**
+    - Les fonctionnalités critiques (transfert, blocage, remboursement) sont sécurisées.
+    - Les frais de gas sont optimisés pour un usage régulier.
+
+---
+
+### **Livrables de Chaque Phase**
+1. **Phase 1 :** Token ASA + mécanisme de blocage et de collatéral.
+2. **Phase 2 :** Redistribution et obligations opérationnelles.
+3. **Phase 3 :** Gouvernance et mécanismes de vote fonctionnels.
+4. **Phase 4 :** Intégration des oracles et optimisation.
+5. **Phase 5 :** Déploiement final et tests sur le réseau principal.
+
+---
+
+### **Plan d’Action**
+- **Semaine 1-4 :** Phase 1 (token ASA, blocage, collatéral).
+- **Semaine 5-8 :** Phase 2 (redistribution, obligations).
+- **Semaine 9-12 :** Phase 3 (gouvernance, votes).
+- **Semaine 13-16 :** Phase 4 (oracles, optimisation).
+- **Semaine 17-18 :** Phase 5 (testnet, mainnet).
+
+---
+
+Dis-moi si tu veux ajuster une étape ou approfondir un point spécifique !
+
+Mécanisme Technique pour le Système de Token avec Obligations
+
+1. Structure Globale
+	1. Nombre de Tokens Fixe :
+		○ Le nombre total de tokens est défini dès le départ.
+		○ Aucun nouveau token n’est créé ou détruit sans un vote des investisseurs.
+	2. Obligations et Collatéral :
+		○ Les investisseurs bloquent leurs tokens pour obtenir des obligations.
+		○ Le créateur doit déposer un collatéral (ex. 30%) en stablecoins pour débloquer une part des fonds levés (ex. 70%).
+	3. Réserve :
+		○ Le collatéral déposé constitue une réserve bloquée.
+		○ Cette réserve est utilisée pour garantir les obligations et redistribuer un rendement.
+
+2. Redistribution du Collatéral
+	1. Propriété de la Réserve :
+		○ Le collatéral reste sous le contrôle des investisseurs et est redistribué périodiquement.
+	2. Taux de Redistribution :
+		○ Fixé par un vote des investisseurs à la majorité (ex. 51%).
+		○ Le montant redistribué ne dépasse pas un plafond annuel défini.
+	3. Proportionnalité :
+		○ La redistribution est effectuée en fonction du nombre de tokens bloqués par chaque investisseur.
+
+3. Émission de Nouveaux Tokens
+	1. Vote d’Émission :
+		○ Les investisseurs votent pour décider d’émettre de nouveaux tokens.
+		○ La décision est validée par une majorité simple (ex. 51%).
+	2. Distribution des Nouveaux Tokens :
+		○ Les nouveaux tokens sont distribués proportionnellement aux parts bloquées des investisseurs.
+	3. Utilisation des Nouveaux Tokens :
+		○ Les tokens émis peuvent être : 
+			§ Vendus sur le marché secondaire.
+			§ Utilisés pour émettre de nouvelles obligations.
+
+4. Gouvernance et Rééquilibrage
+	1. Vote des Investisseurs :
+		○ Les investisseurs contrôlent les décisions clés, comme : 
+			§ Le taux de redistribution.
+			§ L’émission de nouveaux tokens.
+			§ La réallocation de la réserve.
+	2. Rééquilibrage Dynamique :
+		○ Si la valeur des tokens augmente, le collatéral requis diminue automatiquement.
+		○ Si la valeur stagne ou baisse, le créateur doit reconstituer le collatéral.
+
+5. Paiement des Obligations
+	1. Remboursement :
+		○ Les obligations sont remboursées en tokens à l’échéance.
+		○ Le montant remboursé est basé sur le nombre d’obligations initiales, indépendamment de la valeur actuelle du token.
+	2. Garantie :
+		○ La réserve assure la stabilité en cas de défaut ou de fluctuation.
+
+6. Flux Financiers
+	1. Utilisation des Fonds :
+		○ Le créateur utilise jusqu’à 70% des fonds levés après dépôt du collatéral.
+		○ Les fonds débloqués sont disponibles immédiatement pour des dépenses réelles.
+	2. Redistribution des Rendements :
+		○ Une partie de la réserve est redistribuée périodiquement selon le taux fixé.
+
+7. Mécanismes Techniques Clés
+	1. Gestion Automatisée :
+		○ Le smart contract gère : 
+			§ Le suivi des tokens bloqués.
+			§ Les redistributions.
+			§ Les remboursements.
+			§ Les votes.
+	2. Calcul Proportionnel :
+		○ Les parts des investisseurs dans la réserve et les nouveaux tokens sont calculées en fonction de leur contribution relative.
+	3. Vérifications et Appels de Marge :
+		○ Le contrat vérifie que le collatéral respecte le ratio requis.
+		○ Si le collatéral diminue sous le seuil, le créateur doit le reconstituer.
+
+Résumé
+Le système combine une gouvernance décentralisée avec des mécanismes automatiques de redistribution, d'émission de tokens, et de rééquilibrage, tout en garantissant une stabilité pour les investisseurs et une flexibilité pour le créateur.
+
+À partir de l’adresse <https://chatgpt.com/g/g-p-675d03e724408191a2ea154490f5fc6c-casysrpg/c/676530a7-33b8-8007-87fb-e608d96ddfb8> 
+
